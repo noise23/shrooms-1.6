@@ -1,0 +1,97 @@
+---
+name: "deps-win"
+suites:
+- "focal"
+architectures:
+- "amd64"
+packages:
+- "mingw-w64"
+- "g++-mingw-w64"
+- "git-core"
+- "zip"
+- "faketime"
+- "psmisc"
+reference_datetime: "2023-01-30 00:00:00"
+remotes: []
+files:
+- "openssl-1.1.1t.tar.gz"
+- "db-18.1.40.tar.gz"
+- "miniupnpc-1.9.20140401.tar.gz"
+- "zlib-1.2.13.tar.gz"
+- "libpng-1.6.39-fix.tar.xz"
+- "qrencode-4.1.1-fix.tar.gz"
+script: |
+  #
+  export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1
+  export FAKETIME=$REFERENCE_DATETIME
+  export TZ=UTC
+  export INSTALLPREFIX=$OUTDIR/staging/deps
+  export HOST=i686-w64-mingw32
+  # Integrity Check
+  echo "d02670112125300f7a3d61421714d99105edd90190bf12542d16785f16f017aa  miniupnpc-1.9.20140401.tar.gz"   | sha256sum -c
+
+  #
+  mkdir -p $INSTALLPREFIX
+  #
+  tar xzf openssl-1.1.1t.tar.gz
+  cd openssl-1.1.1t
+  ./Configure --cross-compile-prefix=$HOST- no-shared no-dso mingw --prefix=$INSTALLPREFIX --openssldir=
+  make
+  make install_sw
+  cd ..
+  #
+  tar xzf db-18.1.40.tar.gz
+  cd db-18.1.40/build_unix
+  ../dist/configure --prefix=$INSTALLPREFIX --enable-mingw --enable-cxx --host=$HOST --disable-shared --disable-replication --with-mutex=x86/gcc-assembly
+  sed -i 's/WinIoCtl.h/winioctl.h/' ../src/dbinc/win_db.h
+  make $MAKEOPTS library_build
+  make install_lib install_include
+  cd ../..
+  #
+  tar xzf miniupnpc-1.9.20140401.tar.gz
+  cd miniupnpc-1.9.20140401
+  echo "
+  --- miniupnpc-1.9/Makefile.mingw.orig   2013-09-29 18:52:51.014087958 -1000
+  +++ miniupnpc-1.9/Makefile.mingw        2013-09-29 19:09:29.663318691 -1000
+  @@ -67,8 +67,8 @@
+   
+   wingenminiupnpcstrings.o:	wingenminiupnpcstrings.c
+   
+  -miniupnpcstrings.h: miniupnpcstrings.h.in wingenminiupnpcstrings
+  -	wingenminiupnpcstrings \$< \$@
+  +miniupnpcstrings.h: miniupnpcstrings.h.in 
+  +	sed -e 's|OS/version|MSWindows/5.1.2600|' -e 's|MINIUPNPC_VERSION_STRING \"version\"|MINIUPNPC_VERSION_STRING \"VERSIONHERE\"|' \$< > \$@
+   
+   minixml.o:	minixml.c minixml.h miniupnpcstrings.h
+   
+  " | sed "s/VERSIONHERE/$(cat VERSION)/" | patch -p1
+  mkdir -p dll
+  make -f Makefile.mingw CC=$HOST-gcc AR=$HOST-ar libminiupnpc.a
+  install -d $INSTALLPREFIX/include/miniupnpc
+  install *.h $INSTALLPREFIX/include/miniupnpc
+  install libminiupnpc.a  $INSTALLPREFIX/lib
+  cd ..
+  #
+  tar xzf zlib-1.2.13.tar.gz
+  cd zlib-1.2.13
+  CROSS_PREFIX=$HOST- ./configure --prefix=$INSTALLPREFIX --static
+  make
+  make install
+  cd ..
+  #
+  tar xf libpng-1.6.39-fix.tar.xz
+  cd libpng-1.6.39
+  CPPFLAGS="-I$INSTALLPREFIX/include" LDFLAGS="-L$INSTALLPREFIX/lib" ./configure --disable-shared --prefix=$INSTALLPREFIX --host=$HOST
+  make $MAKEOPTS
+  make install
+  cd ..
+  #
+  tar xzf qrencode-4.1.1-fix.tar.gz
+  cd qrencode-4.1.1
+  png_CFLAGS="-I$INSTALLPREFIX/include" png_LIBS="-L$INSTALLPREFIX/lib -lpng" ./configure --enable-static --disable-shared --without-tools --prefix=$INSTALLPREFIX --host=$HOST
+  make
+  make install
+  cd ..
+  #
+  cd $INSTALLPREFIX
+  zip -r $OUTDIR/deps-win-ssl1.1.1t-db18.1.40-win32-focal.zip include lib

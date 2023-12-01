@@ -1,0 +1,57 @@
+---
+name: "shrooms"
+suites:
+- "focal"
+architectures:
+- "amd64"
+packages:
+- "mingw-w64"
+- "g++-mingw-w64"
+- "autoconf"
+- "automake"
+- "libtool"
+- "git-core"
+- "unzip"
+- "nsis"
+reference_datetime: "2023-03-30 00:00:00"
+remotes: []
+files:
+- "qt5.12.4-ssl1.1.1t-win64-focal.zip"
+- "boost-1.74.0-win64-focal.zip"
+- "deps-win-ssl1.1.1t-db18.1.40-win64-focal.zip"
+- "shrooms.zip"
+script: |
+  #
+  STAGING=$HOME/staging
+  HOST=x86_64-w64-mingw32
+  #
+  mkdir -p $STAGING
+  cd $STAGING
+  unzip ../build/qt5.12.4-ssl1.1.1t-win64-focal.zip
+  unzip ../build/boost-1.74.0-win64-focal.zip
+  unzip ../build/deps-win-ssl1.1.1t-db18.1.40-win64-focal.zip
+  unzip ../build/shrooms.zip -d $HOME/build/
+  unzip ../build/deps-win-ssl1.1.1t-db18.1.40-win64-focal.zip -d $HOME/build/
+  unzip ../build/boost-1.74.0-win64-focal.zip -d $HOME/build/
+  cd $HOME/build/
+  #
+
+  cd shrooms
+  export PATH=$STAGING/host/bin:$PATH
+  mkdir -p $OUTDIR/src
+  git archive HEAD | tar -x -C $OUTDIR/src
+  cp $OUTDIR/src/doc/README_windows.txt $OUTDIR/readme.txt
+  ln -s $STAGING $HOME/qt
+  $HOME/staging/host/bin/qmake -spec win32-g++ MINIUPNPC_LIB_PATH=$STAGING MINIUPNPC_INCLUDE_PATH=$STAGING BDB_LIB_PATH=$STAGING BDB_INCLUDE_PATH=$STAGING BOOST_LIB_PATH=$STAGING BOOST_INCLUDE_PATH=$STAGING BOOST_LIB_SUFFIX=-mt-s-x64 OPENSSL_LIB_PATH=$STAGING OPENSSL_INCLUDE_PATH=$STAGING QRENCODE_LIB_PATH=$STAGING QRENCODE_INCLUDE_PATH=$STAGING USE_QRCODE=1 ZLIB_LIB_PATH=$STAGING ZLIB_INCLUDE_PATH=$STAGING PNG_LIB_PATH=$STAGING PNG_INCLUDE_PATH=$STAGING INCLUDEPATH=$STAGING DEFINES=BOOST_THREAD_USE_LIB BITCOIN_NEED_QT_PLUGINS=0 QMAKE_LRELEASE=lrelease QMAKE_CXXFLAGS=-frandom-seed=shrooms USE_BUILD_INFO=1 USE_SSE2=1
+  make $MAKEOPTS
+  $HOST-strip release/SHROOMS-qt.exe
+  cp release/SHROOMS-qt.exe $OUTDIR/
+  #
+#  cd src
+#  export LD_PRELOAD=/usr/lib/faketime/libfaketime.so.1
+#  export FAKETIME=$REFERENCE_DATETIME
+#  export TZ=UTC
+#  make -f makefile.linux-mingw $MAKEOPTS DEPSDIR=$STAGING versiond.exe USE_UPNP=0 DEBUGFLAGS="-frandom-seed=shrooms" USE_SSE2=1
+#  $HOST-strip SHROOMSd.exe
+#  mkdir $OUTDIR/daemon
+#  cp SHROOMSd.exe $OUTDIR/daemon
