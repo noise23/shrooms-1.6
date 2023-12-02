@@ -16,7 +16,6 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/foreach.hpp>
 
-
 #include <stdio.h>
 
 using namespace std;
@@ -2404,13 +2403,13 @@ bool CheckDiskSpace(uint64_t nAdditionalBytes)
 
 static filesystem::path BlockFilePath(unsigned int nFile)
 {
-    string strBlockFn = strprintf("blk%04u.dat", nFile);
-    return GetDataDir() / strBlockFn;
+    string strBlockFn = strprintf("blk%05u.dat", nFile);
+    return GetDataDir() / "blocks" / strBlockFn;
 }
 
 FILE* OpenBlockFile(unsigned int nFile, unsigned int nBlockPos, const char* pszMode)
 {
-    if ((nFile < 1) || (nFile == (unsigned int) -1))
+    if (nFile == (unsigned int) -1)
         return NULL;
     FILE* file = fopen(BlockFilePath(nFile).string().c_str(), pszMode);
     if (!file)
@@ -2426,7 +2425,7 @@ FILE* OpenBlockFile(unsigned int nFile, unsigned int nBlockPos, const char* pszM
     return file;
 }
 
-static unsigned int nCurrentBlockFile = 1;
+static unsigned int nCurrentBlockFile = 0;
 
 FILE* AppendBlockFile(unsigned int& nFileRet)
 {
@@ -2438,8 +2437,7 @@ FILE* AppendBlockFile(unsigned int& nFileRet)
             return NULL;
         if (fseek(file, 0, SEEK_END) != 0)
             return NULL;
-        // FAT32 file size max 4GB, fseek and ftell max 2GB, so we must stay under 2GB
-        if (ftell(file) < (long)(0x7F000000 - MAX_SIZE))
+        if (ftell(file) < MAX_BLOCKFILE_SIZE)
         {
             nFileRet = nCurrentBlockFile;
             return file;
@@ -2510,8 +2508,7 @@ bool LoadBlockIndex(bool fAllowNew)
 
         assert(block.hashMerkleRoot == uint256("0xc18404b003fb8a9644fb68c73207d19ad250dc054314798ca91c52bb355f2c3f"));
 
-
-	    block.print();
+        block.print();
         assert(block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
         assert(block.CheckBlock());
 

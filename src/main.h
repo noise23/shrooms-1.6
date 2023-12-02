@@ -10,9 +10,7 @@
 #include "net.h"
 #include "script.h"
 #include "scrypt.h"
-
 #include "util.h"
-
 
 #include <iostream>
 #include <list>
@@ -36,6 +34,8 @@ static const unsigned int MAX_BLOCK_SIZE = 20000000;
 static const unsigned int MAX_BLOCK_SIZE_GEN = MAX_BLOCK_SIZE/2;
 static const unsigned int MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
 static const unsigned int MAX_ORPHAN_TRANSACTIONS = MAX_BLOCK_SIZE/100;
+/** The maximum size for blkxxxxx.dat files */
+static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
 static const unsigned int MAX_INV_SZ = 50000;
 static const int64_t MIN_TX_FEE = 1000000;
 static const int64_t MIN_RELAY_TX_FEE = MIN_TX_FEE;
@@ -201,8 +201,6 @@ public:
     }
 };
 
-
-
 /** An inpoint - a combination of a transaction and an index n into its vin */
 class CInPoint
 {
@@ -215,8 +213,6 @@ public:
     void SetNull() { ptx = NULL; n = (unsigned int) -1; }
     bool IsNull() const { return (ptx == NULL && n == (unsigned int) -1); }
 };
-
-
 
 /** An outpoint - a combination of a transaction hash and an index n into its vout */
 class COutPoint
@@ -256,9 +252,6 @@ public:
         printf("%s\n", ToString().c_str());
     }
 };
-
-
-
 
 /** An input of a transaction.  It contains the location of the previous
  * transaction's output that it claims and a signature that matches the
@@ -340,9 +333,6 @@ public:
     }
 };
 
-
-
-
 /** An output of a transaction.  It contains the public key that the next input
  * must be able to sign with to claim it.
  */
@@ -423,9 +413,6 @@ public:
         printf("%s\n", ToString().c_str());
     }
 };
-
-
-
 
 enum GetMinFee_mode
 {
@@ -670,7 +657,6 @@ public:
         printf("%s", ToString().c_str());
     }
 
-
     bool ReadFromDisk(CTxDB& txdb, COutPoint prevout, CTxIndex& txindexRet);
     bool ReadFromDisk(CTxDB& txdb, COutPoint prevout);
     bool ReadFromDisk(COutPoint prevout);
@@ -712,10 +698,6 @@ protected:
     const CTxOut& GetOutputFor(const CTxIn& input, const MapPrevTx& inputs) const;
 };
 
-
-
-
-
 /** A transaction with a merkle branch linking it to the block chain. */
 class CMerkleTx : public CTransaction
 {
@@ -747,7 +729,6 @@ public:
         fMerkleVerified = false;
     }
 
-
     IMPLEMENT_SERIALIZE
     (
         nSerSize += SerReadWrite(s, *(CTransaction*)this, nType, nVersion, ser_action);
@@ -756,7 +737,6 @@ public:
         READWRITE(vMerkleBranch);
         READWRITE(nIndex);
     )
-
 
     int SetMerkleBranch(const CBlock* pblock=NULL);
 
@@ -771,9 +751,6 @@ public:
     bool AcceptToMemoryPool(CTxDB& txdb, bool fCheckInputs=true);
     bool AcceptToMemoryPool();
 };
-
-
-
 
 /**  A txdb record that contains the disk location of a transaction and the
  * locations of transactions that spend its outputs.  vSpent is really only
@@ -829,8 +806,6 @@ public:
 
 };
 
-
-
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
  * requirements.  When they solve the proof-of-work, they broadcast the block
@@ -838,11 +813,9 @@ public:
  * in the block is a special one that creates a new coin owned by the creator
  * of the block.
  *
- * Blocks are appended to blk0001.dat files on disk.  Their location on disk
+ * Blocks are appended to blk00000.dat files on disk.  Their location on disk
  * is indexed by CBlockIndex objects in memory.
  */
-
-
 class CBlock
 {
 public:
@@ -1046,7 +1019,6 @@ public:
         return hash;
     }
 
-
     bool WriteToDisk(unsigned int& nFileRet, unsigned int& nBlockPosRet)
     {
         // Open history file to append
@@ -1099,8 +1071,6 @@ public:
         return true;
     }
 
-
-
     void print() const
     {
         printf("CBlock(hash=%s, ver=%d, hashPrevBlock=%s, hashMerkleRoot=%s, nTime=%u, nBits=%08x, nNonce=%u, vtx=%" PRIszu ", vchBlockSig=%s)\n",
@@ -1137,11 +1107,6 @@ public:
 private:
     bool SetBestChainInner(CTxDB& txdb, CBlockIndex *pindexNew);
 };
-
-
-
-
-
 
 /** The block chain is a tree shaped structure starting with the
  * genesis block at the root, with each block potentially having multiple
@@ -1370,8 +1335,6 @@ public:
     }
 };
 
-
-
 /** Used to marshal pointers into hashes for db storage. */
 class CDiskBlockIndex : public CBlockIndex
 {
@@ -1464,13 +1427,6 @@ public:
         printf("%s\n", ToString().c_str());
     }
 };
-
-
-
-
-
-
-
 
 /** Describes a place in the block chain to another node such that if the
  * other node doesn't have the same branch, it can find a recent common trunk.
@@ -1598,13 +1554,6 @@ public:
         return pindex->nHeight;
     }
 };
-
-
-
-
-
-
-
 
 class CTxMemPool
 {
