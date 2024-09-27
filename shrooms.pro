@@ -217,8 +217,15 @@ HEADERS += src/qt/bitcoingui.h \
     src/version.h \
     src/netbase.h \
     src/ntp.h \
-    src/clientversion.h 
-	
+    src/clientversion.h \
+    src/crypto/common.h \
+    src/crypto/aes.h \
+    src/crypto/sha256.h \
+    src/crypto/hmac_sha256.h \
+    src/crypto/sha512.h \
+    src/crypto/ripemd160.h \
+    src/crypto/sha1.h
+
 SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/transactiontablemodel.cpp \
     src/qt/addresstablemodel.cpp \
@@ -286,7 +293,13 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/scrypt-x86.S \
     src/scrypt-x86_64.S \
     src/scrypt.cpp \
-    src/pbkdf2.cpp 
+    src/pbkdf2.cpp \
+    src/crypto/aes.cpp \
+    src/crypto/sha256.cpp \
+    src/crypto/hmac_sha256.cpp \
+    src/crypto/sha512.cpp \
+    src/crypto/ripemd160.cpp \
+    src/crypto/sha1.cpp
 
 RESOURCES += \
     src/qt/bitcoin.qrc 

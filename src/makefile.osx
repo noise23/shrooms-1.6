@@ -94,7 +94,13 @@ OBJS= \
     obj/kernel.o \
     obj/scrypt.o \
     obj/scrypt-x86.o \
-    obj/scrypt-x86_64.o
+    obj/scrypt-x86_64.o \
+    obj/crypto/aes.o \
+    obj/crypto/sha256.o \
+    obj/crypto/hmac_sha256.o \
+    obj/crypto/sha512.o \
+    obj/crypto/ripemd160.o \
+    obj/crypto/sha1.o
 
 ifndef USE_UPNP
 	override USE_UPNP = -
