@@ -14,6 +14,7 @@
 #include <boost/variant.hpp>
 
 #include "keystore.h"
+#include "util.h"
 #include "bignum.h"
 
 typedef std::vector<unsigned char> valtype;
