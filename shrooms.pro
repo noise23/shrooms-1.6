@@ -253,6 +253,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/net.cpp \
     src/checkpoints.cpp \
     src/addrman.cpp \
+    src/base58.cpp \
     src/db.cpp \
     src/walletdb.cpp \
     src/qt/clientmodel.cpp \
