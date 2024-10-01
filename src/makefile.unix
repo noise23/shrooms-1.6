@@ -106,6 +106,7 @@ OBJS= \
     obj/ntp.o \
     obj/addrman.o \
     obj/crypter.o \
+    obj/cleanse.o \
     obj/key.o \
     obj/db.o \
     obj/init.o \

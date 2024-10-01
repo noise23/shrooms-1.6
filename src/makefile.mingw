@@ -57,6 +57,7 @@ OBJS= \
     obj/netbase.o \
     obj/ntp.o \
     obj/addrman.o \
+    obj/cleanse.o \
     obj/crypter.o \
     obj/key.o \
     obj/db.o \
