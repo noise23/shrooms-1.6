@@ -95,6 +95,13 @@ OBJS= \
 
 all: SHROOMSd.exe
 
+# build secp256k1
+DEFS += $(addprefix -I,$(CURDIR)/secp256k1/include)
+secp256k1/src/libsecp256k1_la-secp256k1.o:
+	@echo "Building Secp256k1 ..."; cd secp256k1; chmod 755 *; ./autogen.sh; ./configure --disable-shared --with-pic --enable-benchmark=no --enable-tests=no --enable-exhaustive-tests=no --enable-module-recovery --enable-module-schnorrsig --enable-experimental; make; cd ..;
+SHROOMSd.exe: secp256k1/src/libsecp256k1_la-secp256k1.o
+
+# build leveldb
 LIBS += $(CURDIR)/leveldb/libleveldb.a $(CURDIR)/leveldb/libmemenv.a
 DEFS += -I"$(CURDIR)/leveldb/include"
 DEFS += -I"$(CURDIR)/leveldb/helpers"
