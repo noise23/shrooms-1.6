@@ -174,6 +174,7 @@ public:
         EC_KEY_set_conv_form(pkey, fCompressed ? POINT_CONVERSION_COMPRESSED : POINT_CONVERSION_UNCOMPRESSED);
         return i2d_ECPrivateKey(pkey, &privkey);
     }
+
     bool SetPrivKey(const unsigned char* privkey, size_t size, bool fSkipCheck=false) {
         if (d2i_ECPrivateKey(&pkey, &privkey, size)) {
             // d2i_ECPrivateKey returns true if parsing succeeds.
@@ -201,9 +202,26 @@ public:
     }
 
     bool Sign(const uint256 &hash, std::vector<unsigned char>& vchSig) {
+        vchSig.clear();
+        ECDSA_SIG *sig = ECDSA_do_sign((unsigned char*)&hash, sizeof(hash), pkey);
+        if (sig == NULL)
+            return false;
+        if (BN_is_odd(sig->s)) {
+            // enforce even S values, by negating the value (modulo the order) if odd
+            BN_CTX *ctx = BN_CTX_new();
+            BN_CTX_start(ctx);
+            const EC_GROUP *group = EC_KEY_get0_group(pkey);
+            BIGNUM *order = BN_CTX_get(ctx);
+            EC_GROUP_get_order(group, order, ctx);
+            BN_sub(sig->s, order, sig->s);
+            BN_CTX_end(ctx);
+            BN_CTX_free(ctx);
+        }
         unsigned int nSize = ECDSA_size(pkey);
         vchSig.resize(nSize); // Make sure it is big enough
-        assert(ECDSA_sign(0, (unsigned char*)&hash, sizeof(hash), &vchSig[0], &nSize, pkey));
+        unsigned char *pos = &vchSig[0];
+        nSize = i2d_ECDSA_SIG(sig, &pos);
+        ECDSA_SIG_free(sig);
         vchSig.resize(nSize); // Shrink to fit actual size
         return true;
     }
@@ -334,27 +352,8 @@ const unsigned char vchZero[0] = {};
 }; // end of anonymous namespace
 
 bool CKey::Check(const unsigned char *vch) {
-    // Do not convert to OpenSSL's data structures for range-checking keys,
-    // it's easy enough to do directly.
-    static const unsigned char vchMax[32] = {
-        0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
-        0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFE,
-        0xBA,0xAE,0xDC,0xE6,0xAF,0x48,0xA0,0x3B,
-        0xBF,0xD2,0x5E,0x8C,0xD0,0x36,0x41,0x40
-    };
-    bool fIsZero = true;
-    for (int i=0; i<32 && fIsZero; i++)
-        if (vch[i] != 0)
-            fIsZero = false;
-    if (fIsZero)
-        return false;
-    for (int i=0; i<32; i++) {
-        if (vch[i] < vchMax[i])
-            return true;
-        if (vch[i] > vchMax[i])
-            return false;
-    }
-    return true;
+    return CompareBigEndian(vch, 32, vchZero, 0) > 0 &&
+           CompareBigEndian(vch, 32, vchMaxModOrder, 32) <= 0;
 }
 
 bool CKey::CheckSignatureElement(const unsigned char *vch, int len, bool half) {
