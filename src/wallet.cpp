@@ -37,14 +37,14 @@ CPubKey CWallet::GenerateNewKey()
     bool fCompressed = CanSupportFeature(FEATURE_COMPRPUBKEY); // default to compressed public keys if we want 0.6.0 wallets
 
     RandAddSeedPerfmon();
-    CKey key;
-    key.MakeNewKey(fCompressed);
+    CKey secret;
+    secret.MakeNewKey(fCompressed);
 
     // Compressed public keys were introduced in version 0.6.0
     if (fCompressed)
         SetMinVersion(FEATURE_COMPRPUBKEY);
 
-    CPubKey pubkey = key.GetPubKey();
+    CPubKey pubkey = secret.GetPubKey();
 
     // Create new metadata
     int64_t nCreationTime = GetTime();
@@ -52,21 +52,20 @@ CPubKey CWallet::GenerateNewKey()
     if (!nTimeFirstKey || nCreationTime < nTimeFirstKey)
         nTimeFirstKey = nCreationTime;
 
-    if (!AddKey(key))
+    if (!AddKeyPubKey(secret, pubkey))
         throw std::runtime_error("CWallet::GenerateNewKey() : AddKey failed");
-    return key.GetPubKey();
+    return pubkey;
 }
 
-bool CWallet::AddKey(const CKey& key)
+bool CWallet::AddKeyPubKey(const CKey& secret, const CPubKey &pubkey)
 {
-    CPubKey pubkey = key.GetPubKey();
-
-    if (!CCryptoKeyStore::AddKey(key))
+    if (!CCryptoKeyStore::AddKeyPubKey(secret, pubkey))
         return false;
     if (!fFileBacked)
         return true;
-    if (!IsCrypted())
-        return CWalletDB(strWalletFile).WriteKey(pubkey, key.GetPrivKey(), mapKeyMetadata[pubkey.GetID()]);
+    if (!IsCrypted()) {
+        return CWalletDB(strWalletFile).WriteKey(pubkey, secret.GetPrivKey(), mapKeyMetadata[pubkey.GetID()]);
+    }
     return true;
 }
 
@@ -1702,39 +1701,39 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
         return false;
 
     if(fCombineDust) //presstab HyperStake - this combination code iterates through all of your outputs on successful coinstake, so its useful to have user be able to choose whether this is necessary
-	{
-	    for (auto pcoin : setCoins)
-	    {
-	        // Attempt to add more inputs
-	        // Only add coins of the same key/address as kernel
-	        if (txNew.vout.size() == 2 && ((pcoin.first->vout[pcoin.second].scriptPubKey == scriptPubKeyKernel || pcoin.first->vout[pcoin.second].scriptPubKey == txNew.vout[1].scriptPubKey))
-	            && pcoin.first->GetHash() != txNew.vin[0].prevout.hash)
-	        {
-	            int64_t nTimeWeight = GetWeight((int64_t)pcoin.first->nTime, (int64_t)txNew.nTime);
+    {
+        for (auto pcoin : setCoins)
+        {
+            // Attempt to add more inputs
+            // Only add coins of the same key/address as kernel
+            if (txNew.vout.size() == 2 && ((pcoin.first->vout[pcoin.second].scriptPubKey == scriptPubKeyKernel || pcoin.first->vout[pcoin.second].scriptPubKey == txNew.vout[1].scriptPubKey))
+                && pcoin.first->GetHash() != txNew.vin[0].prevout.hash)
+            {
+                int64_t nTimeWeight = GetWeight((int64_t)pcoin.first->nTime, (int64_t)txNew.nTime);
 
-	            // Stop adding more inputs if already too many inputs
-	            if (txNew.vin.size() >= 100)
-	                break;
-	            // Stop adding more inputs if value is already pretty significant
-	            if (nCredit >= nStakeCombineThreshold)
-	                break;
-	            // Stop adding inputs if reached reserve limit
-	            if (nCredit + pcoin.first->vout[pcoin.second].nValue > nBalance - nReserveBalance)
-	                break;
-	            // Do not add additional significant input
-	            if (pcoin.first->vout[pcoin.second].nValue >= nStakeCombineThreshold)
-	                continue;
-	            // Do not add input that is still too young
-	            if (nTimeWeight < nStakeMinAge)
-	                continue;
+                // Stop adding more inputs if already too many inputs
+                if (txNew.vin.size() >= 100)
+                    break;
+                // Stop adding more inputs if value is already pretty significant
+                if (nCredit >= nStakeCombineThreshold)
+                    break;
+                // Stop adding inputs if reached reserve limit
+                if (nCredit + pcoin.first->vout[pcoin.second].nValue > nBalance - nReserveBalance)
+                    break;
+                // Do not add additional significant input
+                if (pcoin.first->vout[pcoin.second].nValue >= nStakeCombineThreshold)
+                    continue;
+                // Do not add input that is still too young
+                if (nTimeWeight < nStakeMinAge)
+                    continue;
 
-	            txNew.vin.push_back(CTxIn(pcoin.first->GetHash(), pcoin.second));
-	            nCredit += pcoin.first->vout[pcoin.second].nValue;
-	            vwtxPrev.push_back(pcoin.first);
-	        }
-	    }
-	}
-	
+                txNew.vin.push_back(CTxIn(pcoin.first->GetHash(), pcoin.second));
+                nCredit += pcoin.first->vout[pcoin.second].nValue;
+                vwtxPrev.push_back(pcoin.first);
+            }
+        }
+    }
+
     // Calculate coin age reward
     {
         uint64_t nCoinAge;
@@ -1774,7 +1773,6 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     // Successfully generated coinstake
     return true;
 }
-
 
 // Call after CreateTransaction unless you want to abort
 bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
@@ -1825,9 +1823,6 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
     return true;
 }
 
-
-
-
 string CWallet::SendMoney(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNew, bool fAskFee)
 {
     CReserveKey reservekey(this);
@@ -1865,8 +1860,6 @@ string CWallet::SendMoney(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNe
     return "";
 }
 
-
-
 string CWallet::SendMoneyToDestination(const CTxDestination& address, int64_t nValue, CWalletTx& wtxNew, bool fAskFee)
 {
     // Check amount
@@ -1881,9 +1874,6 @@ string CWallet::SendMoneyToDestination(const CTxDestination& address, int64_t nV
 
     return SendMoney(scriptPubKey, nValue, wtxNew, fAskFee);
 }
-
-
-
 
 DBErrors CWallet::LoadWallet(bool& fFirstRunRet)
 {

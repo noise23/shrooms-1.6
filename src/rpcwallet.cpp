@@ -147,11 +147,9 @@ Value getnewpubkey(const Array& params, bool fHelp)
     CKeyID keyID = newKey.GetID();
 
     pwalletMain->SetAddressBookName(keyID, strAccount);
-    vector<unsigned char> vchPubKey = newKey.Raw();
 
-    return HexStr(vchPubKey.begin(), vchPubKey.end());
+    return HexStr(newKey.begin(), newKey.end());
 }
-
 
 Value getnewaddress(const Array& params, bool fHelp)
 {
@@ -436,11 +434,11 @@ Value verifymessage(const Array& params, bool fHelp)
     ss << strMessageMagic;
     ss << strMessage;
 
-    CKey key;
-    if (!key.SetCompactSignature(Hash(ss.begin(), ss.end()), vchSig))
+    CPubKey pubkey;
+    if (!pubkey.RecoverCompact(Hash(ss.begin(), ss.end()), vchSig))
         return false;
 
-    return (key.GetPubKey().GetID() == keyID);
+    return (pubkey.GetID() == keyID);
 }
 
 
@@ -802,7 +800,7 @@ Value addmultisigaddress(const Array& params, bool fHelp)
         throw runtime_error(
             strprintf("not enough keys supplied "
                       "(got %" PRIszu " keys, but need at least %d to redeem)", keys.size(), nRequired));
-    std::vector<CKey> pubkeys;
+    std::vector<CPubKey> pubkeys;
     pubkeys.resize(keys.size());
     for (unsigned int i = 0; i < keys.size(); i++)
     {
@@ -820,16 +818,18 @@ Value addmultisigaddress(const Array& params, bool fHelp)
             if (!pwalletMain->GetPubKey(keyID, vchPubKey))
                 throw runtime_error(
                     strprintf("no full public key for address %s",ks.c_str()));
-            if (!vchPubKey.IsValid() || !pubkeys[i].SetPubKey(vchPubKey))
+            if (!vchPubKey.IsFullyValid())
                 throw runtime_error(" Invalid public key: "+ks);
+            pubkeys[i] = vchPubKey;
         }
 
         // Case 2: hex public key
         else if (IsHex(ks))
         {
             CPubKey vchPubKey(ParseHex(ks));
-            if (!vchPubKey.IsValid() || !pubkeys[i].SetPubKey(vchPubKey))
+            if (!vchPubKey.IsFullyValid())
                 throw runtime_error(" Invalid public key: "+ks);
+            pubkeys[i] = vchPubKey;
         }
         else
         {
@@ -1788,7 +1788,7 @@ Value makekeypair(const Array& params, bool fHelp)
     CPrivKey vchPrivKey = key.GetPrivKey();
     Object result;
     result.push_back(Pair("PrivateKey", HexStr<CPrivKey::iterator>(vchPrivKey.begin(), vchPrivKey.end())));
-    result.push_back(Pair("PublicKey", HexStr(key.GetPubKey().Raw())));
+    result.push_back(Pair("PublicKey", HexStr(key.GetPubKey())));
     return result;
 }
 
@@ -1796,70 +1796,70 @@ Value combinedust(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
         throw runtime_error(
-			"combinedust <true/false>\n"
-			"Combine dust is a setting in the staking parameters that will iterate through your entire wallet contents to looks for small coins that it can combine into your coinstake transaction." 
-			"set this to false to prevent any combination from occurring \n");
+            "combinedust <true/false>\n"
+            "Combine dust is a setting in the staking parameters that will iterate through your entire wallet contents to looks for small coins that it can combine into your coinstake transaction." 
+            "set this to false to prevent any combination from occurring \n");
     if(params.size() < 1)
         return pwalletMain->fCombineDust;
-	
+
     CWalletDB walletdb(pwalletMain->strWalletFile);
 
-		bool fCombineDust;
-		string strCombineDust = params[0].get_str();
-		if(strCombineDust == "true")
-			fCombineDust = true;
-		else if(strCombineDust == "false")
-			fCombineDust = false;
-		else
+        bool fCombineDust;
+        string strCombineDust = params[0].get_str();
+        if(strCombineDust == "true")
+            fCombineDust = true;
+        else if(strCombineDust == "false")
+            fCombineDust = false;
+        else
         return "Failed to understand true/false parameter. Please use combinedust true/false.\n"
-		"Combine dust is a setting in the staking parameters that will iterate through your entire wallet contents to looks for small coins that it can combine into your coinstake transaction." 
-		"set this to false to prevent any combination from occurring \n";
-		
-		pwalletMain->fCombineDust = fCombineDust;
-		if(walletdb.WriteCombineDust(fCombineDust))
-			return "Combine dust setting saved and written to DB";
-		else
-			return "ERROR: Combine dust setting failed to write to DB";
+        "Combine dust is a setting in the staking parameters that will iterate through your entire wallet contents to looks for small coins that it can combine into your coinstake transaction." 
+        "set this to false to prevent any combination from occurring \n";
+
+        pwalletMain->fCombineDust = fCombineDust;
+        if(walletdb.WriteCombineDust(fCombineDust))
+            return "Combine dust setting saved and written to DB";
+        else
+            return "ERROR: Combine dust setting failed to write to DB";
 }
 
 double GetMoneySupply(int nHeight)
 {
-	CBlockIndex* pindex = FindBlockByHeight(nHeight);
-	double nSupply = pindex->nMoneySupply;	
-	return nSupply / COIN;	
+    CBlockIndex* pindex = FindBlockByHeight(nHeight);
+    double nSupply = pindex->nMoneySupply;	
+    return nSupply / COIN;	
 }
 double GetSupplyChange(int nHeight, int pHeight)
 {
-	double nSupply = GetMoneySupply(nHeight); //present supply
-	double pSupply = GetMoneySupply(pHeight); //previous supply
-	double nChange = nSupply - pSupply; //difference
-	return nChange;
+    double nSupply = GetMoneySupply(nHeight); //present supply
+    double pSupply = GetMoneySupply(pHeight); //previous supply
+    double nChange = nSupply - pSupply; //difference
+    return nChange;
 }
 double GetBlockSpeed(int nHeight, int pHeight)
 {
-	CBlockIndex* pIndex = FindBlockByHeight(nHeight);
-	CBlockIndex* ppIndex = FindBlockByHeight(pHeight);
-	double nTime = pIndex->nTime;
-	double pTime = ppIndex->nTime;
-	double nTimeChange = (nTime - pTime) / 60 / 60 / 24; //in days
-	return nTimeChange;
+    CBlockIndex* pIndex = FindBlockByHeight(nHeight);
+    CBlockIndex* ppIndex = FindBlockByHeight(pHeight);
+    double nTime = pIndex->nTime;
+    double pTime = ppIndex->nTime;
+    double nTimeChange = (nTime - pTime) / 60 / 60 / 24; //in days
+    return nTimeChange;
 }
 double GetRate(int nHeight, int pHeight)
 {
-	double nSupplyChange = GetSupplyChange(nHeight, pHeight);
-	double nTimeChange = GetBlockSpeed(nHeight, pHeight);
-	double nMoneySupply = GetMoneySupply(nHeight);
-	double nRate = nSupplyChange / nMoneySupply / nTimeChange;
-	
-	return nRate;
+    double nSupplyChange = GetSupplyChange(nHeight, pHeight);
+    double nTimeChange = GetBlockSpeed(nHeight, pHeight);
+    double nMoneySupply = GetMoneySupply(nHeight);
+    double nRate = nSupplyChange / nMoneySupply / nTimeChange;
+
+    return nRate;
 }
 double PredictFutureSupply(int nHeight, int pHeight, int nDays)
 {
-	double nRate = GetRate(nHeight, pHeight);
-	double nSupply = GetMoneySupply(nHeight);
-	double fSupply = nSupply * pow( 1 + nRate, nDays ); //compounds daily
-	
-	return fSupply;
+    double nRate = GetRate(nHeight, pHeight);
+    double nSupply = GetMoneySupply(nHeight);
+    double fSupply = nSupply * pow( 1 + nRate, nDays ); //compounds daily
+
+    return fSupply;
 }
 
 Value getmoneysupply(const Array& params, bool fHelp)
@@ -1868,71 +1868,70 @@ Value getmoneysupply(const Array& params, bool fHelp)
         throw runtime_error(
             "getmoneysupply [height]\n"
             "Returns SHROOMS supply at certain block, current SHROOMS supply as default");
-	
+
     GetLastBlockIndex(pindexBest, false);
-	int nHeight = 0;
-	double nMoneySupply = 0;
-	
+    int nHeight = 0;
+    double nMoneySupply = 0;
+
     if (params.size() > 0)
-	{
-		nHeight = pindexBest->nHeight;
-		int pHeight = params[0].get_int();
-		if (pHeight > nHeight || pHeight < 0)
-			nMoneySupply = 0;
-		else
-			nMoneySupply = GetMoneySupply(pHeight);
-	}
-	else
-	{
-		nHeight = pindexBest->nHeight;
-		nMoneySupply = GetMoneySupply(nHeight);
-	}	
-	Object obj;
-	obj.push_back(Pair("SHROOMS supply", nMoneySupply));
+    {
+        nHeight = pindexBest->nHeight;
+        int pHeight = params[0].get_int();
+        if (pHeight > nHeight || pHeight < 0)
+            nMoneySupply = 0;
+        else
+            nMoneySupply = GetMoneySupply(pHeight);
+    }
+    else
+    {
+        nHeight = pindexBest->nHeight;
+        nMoneySupply = GetMoneySupply(nHeight);
+    }
+    Object obj;
+    obj.push_back(Pair("SHROOMS supply", nMoneySupply));
     return obj;
 }
 
 //SHROOMS Supply Information
 Value shroomssupply(const Array& params, bool fHelp)
 {
-	if (fHelp || params.size() != 0)
+    if (fHelp || params.size() != 0)
         throw runtime_error(
             "shroomssupply\n"
             "Show important SHROOMS supply variables.\n");
-	
-	// grab block index of last block
-	GetLastBlockIndex(pindexBest, false);
-	
-	//height of blocks
-	int64_t nHeight = pindexBest->nHeight; //present
-	int64_t n1Height = nHeight - 720; // day -- 720 blocks should be about 1 day if blocks have 120 sec spacing
-	int64_t n7Height = nHeight - 720 * 7; // week
-	int64_t n30Height = nHeight - 720 * 30; // month
-	
-	//print to console
-	Object obj;
-	obj.push_back(Pair("SHROOMS supply - present", GetMoneySupply(nHeight)));
-	obj.push_back(Pair("------------------------------", "------------------------------"));
-	obj.push_back(Pair("SHROOMS supply - 720 blocks ago", GetMoneySupply(n1Height)));
-	obj.push_back(Pair("SHROOMS supply - 5040 blocks ago", GetMoneySupply(n7Height)));
-	obj.push_back(Pair("SHROOMS supply - 21600 blocks ago", GetMoneySupply(n30Height)));
-	obj.push_back(Pair("------------------------------", "------------------------------"));
-	obj.push_back(Pair("SHROOMS germinated(last 720 blocks)", GetSupplyChange(nHeight, n1Height)));
-	obj.push_back(Pair("SHROOMS germinated(last 5040 blocks)", GetSupplyChange(nHeight, n7Height)));
-	obj.push_back(Pair("SHROOMS germinated(last 21600 blocks)", GetSupplyChange(nHeight, n30Height)));
-	obj.push_back(Pair("------------------------------", "------------------------------"));
-	obj.push_back(Pair("time change over 720 blocks, days", GetBlockSpeed(nHeight, n1Height)));
-	obj.push_back(Pair("time change over 5040 blocks, days", GetBlockSpeed(nHeight, n7Height)));
-	obj.push_back(Pair("time change over 21600 blocks, days", GetBlockSpeed(nHeight, n30Height)));
-	obj.push_back(Pair("------------------------------", "------------------------------"));
-	obj.push_back(Pair("avg daily growth rate (last 720 blocks)", GetRate(nHeight, n1Height)));
-	obj.push_back(Pair("avg daily growth rate (last 5040 blocks)", GetRate(nHeight, n7Height)));
-	obj.push_back(Pair("avg daily growth rate (last 21600 blocks)", GetRate(nHeight, n30Height)));
-	obj.push_back(Pair("------------------------------", "------------------------------"));
-	obj.push_back(Pair("projected SHROOMS supply 1 day from now (daily compound)", PredictFutureSupply(nHeight, n1Height, 1)));
-	obj.push_back(Pair("projected SHROOMS supply 7 days from now (daily compound)", PredictFutureSupply(nHeight, n7Height, 7)));
-	obj.push_back(Pair("projected SHROOMS supply 30 days from now (daily compound)", PredictFutureSupply(nHeight, n30Height, 30)));
 
-	return obj;
+    // grab block index of last block
+    GetLastBlockIndex(pindexBest, false);
+
+    //height of blocks
+    int64_t nHeight = pindexBest->nHeight; //present
+    int64_t n1Height = nHeight - 720; // day -- 720 blocks should be about 1 day if blocks have 120 sec spacing
+    int64_t n7Height = nHeight - 720 * 7; // week
+    int64_t n30Height = nHeight - 720 * 30; // month
+
+    //print to console
+    Object obj;
+    obj.push_back(Pair("SHROOMS supply - present", GetMoneySupply(nHeight)));
+    obj.push_back(Pair("------------------------------", "------------------------------"));
+    obj.push_back(Pair("SHROOMS supply - 720 blocks ago", GetMoneySupply(n1Height)));
+    obj.push_back(Pair("SHROOMS supply - 5040 blocks ago", GetMoneySupply(n7Height)));
+    obj.push_back(Pair("SHROOMS supply - 21600 blocks ago", GetMoneySupply(n30Height)));
+    obj.push_back(Pair("------------------------------", "------------------------------"));
+    obj.push_back(Pair("SHROOMS germinated(last 720 blocks)", GetSupplyChange(nHeight, n1Height)));
+    obj.push_back(Pair("SHROOMS germinated(last 5040 blocks)", GetSupplyChange(nHeight, n7Height)));
+    obj.push_back(Pair("SHROOMS germinated(last 21600 blocks)", GetSupplyChange(nHeight, n30Height)));
+    obj.push_back(Pair("------------------------------", "------------------------------"));
+    obj.push_back(Pair("time change over 720 blocks, days", GetBlockSpeed(nHeight, n1Height)));
+    obj.push_back(Pair("time change over 5040 blocks, days", GetBlockSpeed(nHeight, n7Height)));
+    obj.push_back(Pair("time change over 21600 blocks, days", GetBlockSpeed(nHeight, n30Height)));
+    obj.push_back(Pair("------------------------------", "------------------------------"));
+    obj.push_back(Pair("avg daily growth rate (last 720 blocks)", GetRate(nHeight, n1Height)));
+    obj.push_back(Pair("avg daily growth rate (last 5040 blocks)", GetRate(nHeight, n7Height)));
+    obj.push_back(Pair("avg daily growth rate (last 21600 blocks)", GetRate(nHeight, n30Height)));
+    obj.push_back(Pair("------------------------------", "------------------------------"));
+    obj.push_back(Pair("projected SHROOMS supply 1 day from now (daily compound)", PredictFutureSupply(nHeight, n1Height, 1)));
+    obj.push_back(Pair("projected SHROOMS supply 7 days from now (daily compound)", PredictFutureSupply(nHeight, n7Height, 7)));
+    obj.push_back(Pair("projected SHROOMS supply 30 days from now (daily compound)", PredictFutureSupply(nHeight, n30Height, 30)));
+
+    return obj;
 }
-
