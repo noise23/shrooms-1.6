@@ -71,6 +71,7 @@ OBJS= \
     obj/cleanse.o \
     obj/crypter.o \
     obj/key.o \
+    obj/pubkey.o \
     obj/db.o \
     obj/init.o \
     obj/keystore.o \

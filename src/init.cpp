@@ -10,6 +10,7 @@
 #include "util.h"
 #include "ui_interface.h"
 #include "checkpoints.h"
+#include "key.h"
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/convenience.hpp>
@@ -58,6 +59,8 @@ void StartShutdown()
 #endif
 }
 
+static boost::scoped_ptr<ECCVerifyHandle> globalVerifyHandle;
+
 void Shutdown(void* parg)
 {
     static CCriticalSection cs_Shutdown;
@@ -87,6 +90,8 @@ void Shutdown(void* parg)
         boost::filesystem::remove(GetPidFile());
         UnregisterWallet(pwalletMain);
         delete pwalletMain;
+        globalVerifyHandle.reset();
+        ECC_Stop();
         NewThread(ExitTimeout, NULL);
         MilliSleep(50);
         printf("SHROOMS exited\n\n");
@@ -313,7 +318,23 @@ std::string HelpMessage()
     return strUsage;
 }
 
-/** Initialize bitcoin.
+/** Sanity checks
+ *  Ensure that SHROOMS is running in a usable environment with all
+ *  necessary library support.
+ */
+bool InitSanityCheck(void)
+{
+    if(!ECC_InitSanityCheck()) {
+        InitError("Elliptic curve cryptography sanity check failure. Aborting.");
+        return false;
+    }
+
+    // TODO: remaining sanity checks, see #4081
+
+    return true;
+}
+
+/** Initialize SHROOMS.
  *  @pre Parameters should be parsed and config file should be read.
  */
 bool AppInit2()
@@ -467,6 +488,14 @@ bool AppInit2()
     }
 
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
+
+    // Initialize elliptic curve code
+    ECC_Start();
+    globalVerifyHandle.reset(new ECCVerifyHandle());
+
+    // Sanity check
+    if (!InitSanityCheck())
+        return InitError(_("Elliptic curve cryptography sanity check failed. SHROOMS is shutting down."));
 
     std::string strDataDir = GetDataDir().string();
     std::string strWalletFileName = GetArg("-wallet", "wallet.dat");
