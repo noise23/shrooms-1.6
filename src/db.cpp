@@ -18,10 +18,7 @@
 using namespace std;
 using namespace boost;
 
-
 unsigned int nWalletDBUpdated;
-
-
 
 //
 // CDB
@@ -477,11 +474,9 @@ void CDBEnv::Flush(bool fShutdown)
     }
 }
 
-
 //
 // CAddrDB
 //
-
 
 CAddrDB::CAddrDB()
 {
@@ -492,7 +487,7 @@ bool CAddrDB::Write(const CAddrMan& addr)
 {
     // Generate random temporary filename
     unsigned short randv = 0;
-    RAND_bytes((unsigned char *)&randv, sizeof(randv));
+    GetRandBytes((unsigned char *)&randv, sizeof(randv));
     std::string tmpfn = strprintf("peers.dat.%04x", randv);
 
     // serialize addresses, checksum data up to that point, then append csum
@@ -578,4 +573,3 @@ bool CAddrDB::Read(CAddrMan& addr)
 
     return true;
 }
-

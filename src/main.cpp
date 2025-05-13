@@ -2764,7 +2764,6 @@ unsigned char pchMessageStart[4] = { 0xe2, 0xf2, 0xb7, 0xd1 };
 bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 {
     static map<CService, CPubKey> mapReuseKey;
-    RandAddSeedPerfmon();
     if (fDebug)
         printf("received: %s (%lu bytes)\n", strCommand.c_str(), vRecv.size());
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
