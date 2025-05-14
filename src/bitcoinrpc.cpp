@@ -27,6 +27,7 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/shared_ptr.hpp>
 #include <list>
+#include <regex>
 
 #define printf OutputDebugStringF
 
@@ -416,7 +417,8 @@ int ReadHTTPStatus(std::basic_istream<char>& stream, int &proto)
     string str;
     getline(stream, str);
     vector<string> vWords;
-    boost::split(vWords, str, boost::is_any_of(" "));
+    istringstream iss(str);
+    copy(istream_iterator<string>(iss), istream_iterator<string>(), back_inserter(vWords));
     if (vWords.size() < 2)
         return HTTP_INTERNAL_SERVER_ERROR;
     proto = 0;
@@ -491,7 +493,7 @@ bool HTTPAuthorized(map<string, string>& mapHeaders)
     string strAuth = mapHeaders["authorization"];
     if (strAuth.substr(0,6) != "Basic ")
         return false;
-    string strUserPass64 = strAuth.substr(6); boost::trim(strUserPass64);
+    std::string strUserPass64 = std::regex_replace(strAuth.substr(6), static_cast<std::regex>("\\s+"), "");
     string strUserPass = DecodeBase64(strUserPass64);
     return TimingResistantEqual(strUserPass, strRPCUserColonPass);
 }
