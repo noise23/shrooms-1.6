@@ -306,8 +306,8 @@ static const CRPCCommand vRPCCommands[] =
     { "resendtx",               &resendtx,               false,  true},
     { "makekeypair",            &makekeypair,            false,  true},
     { "sendalert",              &sendalert,              false,  false},
-	{ "combinedust",            &combinedust,           false,  false },
-	{ "shroomssupply",          &shroomssupply,          	 true,   false },
+	{ "combinedust",            &combinedust,            false,  false },
+	{ "shroomssupply",          &shroomssupply,          true,   false },
 	{ "getmoneysupply",         &getmoneysupply,         true,   false },
 };
 
@@ -1244,7 +1244,7 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
     if (strMethod == "getblock"               && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "getblockbynumber"       && n > 0) ConvertTo<int64_t>(params[0]);
     if (strMethod == "getblockbynumber"       && n > 1) ConvertTo<bool>(params[1]);
-    if (strMethod == "getmoneysupply"         && n > 0) ConvertTo<boost::int64_t>(params[0]);
+    if (strMethod == "getmoneysupply"         && n > 0) ConvertTo<int64_t>(params[0]);
     if (strMethod == "getmoneysupply"         && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "getblockhash"           && n > 0) ConvertTo<int64_t>(params[0]);
     if (strMethod == "move"                   && n > 2) ConvertTo<double>(params[2]);
