@@ -94,8 +94,8 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("stake",         ValueFromAmount(pwalletMain->GetStake())));
     obj.push_back(Pair("blocks",        (int)nBestHeight));
 
-    timestamping.push_back(Pair("systemclock", GetTime()));
-    timestamping.push_back(Pair("adjustedtime", GetAdjustedTime()));
+    timestamping.push_back(Pair("systemclock", DateTimeStrFormat(GetTime())));
+    timestamping.push_back(Pair("adjustedtime", DateTimeStrFormat(GetAdjustedTime())));
 
     int64_t nNtpOffset = GetNtpOffset(),
             nP2POffset = GetNodesOffset();
@@ -104,7 +104,7 @@ Value getinfo(const Array& params, bool fHelp)
     timestamping.push_back(Pair("p2poffset", nP2POffset != INT64_MAX ? nP2POffset : Value::null));
 
     obj.push_back(Pair("timestamping", timestamping));
-	
+
     obj.push_back(Pair("moneysupply",   ValueFromAmount(pindexBest->nMoneySupply)));
     obj.push_back(Pair("connections",   (int)vNodes.size()));
     obj.push_back(Pair("proxy",         (proxy.first.IsValid() ? proxy.first.ToStringIPPort() : string())));
@@ -113,12 +113,19 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("difficulty",    GetDifficulty(GetLastBlockIndex(pindexBest, true))));
 
     obj.push_back(Pair("testnet",       fTestNet));
-    obj.push_back(Pair("keypoololdest", (int64_t)pwalletMain->GetOldestKeyPoolTime()));
+    obj.push_back(Pair("keypoololdest", DateTimeStrFormat(pwalletMain->GetOldestKeyPoolTime())));
     obj.push_back(Pair("keypoolsize",   (int)pwalletMain->GetKeyPoolSize()));
     obj.push_back(Pair("paytxfee",      ValueFromAmount(nTransactionFee)));
     obj.push_back(Pair("mininput",      ValueFromAmount(nMinimumInputValue)));
-    if (pwalletMain->IsCrypted())
-        obj.push_back(Pair("unlocked_until", (int64_t)nWalletUnlockTime / 1000));
+    obj.push_back(Pair("encrypted",     pwalletMain->IsCrypted()));
+    if (pwalletMain->IsCrypted() && !pwalletMain->IsLocked() )
+    {
+        obj.push_back(Pair("unlocked_until", DateTimeStrFormat(nWalletUnlockTime / 1000)));
+    }
+    else if(pwalletMain->IsCrypted() && pwalletMain->IsLocked() )
+    {
+        obj.push_back(Pair("unlocked_until", "Locked"));
+    }
     obj.push_back(Pair("errors",        GetWarnings("statusbar")));
     obj.push_back(Pair("updates",    "http://shrooms.pw"));
     return obj;
@@ -1468,8 +1475,10 @@ Value walletpassphrase(const Array& params, bool fHelp)
             "Stores the wallet decryption key in memory for <timeout> seconds.");
 
     NewThread(ThreadTopUpKeyPool, NULL);
-    int64_t* pnSleepTime = new int64_t(params[1].get_int64());
-    NewThread(ThreadCleanWalletPassphrase, pnSleepTime);
+
+    // Zero unlock time means forever, well 68 years, forever for crypto.
+    int64_t* nUnlockTime = (params[1].get_int64() == 0) ? new int64_t(std::numeric_limits<int>::max()) : new int64_t(params[1].get_int64());
+    NewThread(ThreadCleanWalletPassphrase, nUnlockTime);
 
     // ppcoin: if user OS account compromised prevent trivial sendmoney commands
     if (params.size() > 2)
