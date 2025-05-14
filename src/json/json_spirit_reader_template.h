@@ -11,7 +11,11 @@
 
 //#define BOOST_SPIRIT_THREADSAFE  // uncomment for multithreaded use, requires linking to boost.thread
 
+#if (BOOST_VERSION >= 107100)
+#include <boost/bind/bind.hpp>
+#else
 #include <boost/bind.hpp>
+#endif
 #include <boost/function.hpp>
 #include <boost/version.hpp>
 
